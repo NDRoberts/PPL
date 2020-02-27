@@ -137,7 +137,7 @@ class Lexer:
         c, ctype = self.get_char()
         # TODO: Finish init - determine getter based on char type,
         #       store (unit, token) pairs in self.parse
-        while ctype and ctype != 'EOF':
+        for _ in range(len(self.data)):
             if ctype == "BLANK":
                 self.get_non_blank()
             elif ctype == "LETTER":
@@ -228,6 +228,11 @@ def numerize(nstr):
 
 
 if __name__ == '__main__':
-    inpt = input("Make like your have a line of inpoots: ")
-    luthor = Lexer(inpt)
+    if len(sys.argv) > 1:
+        target = sys.argv[1]
+        luthor = Lexer(target)
+    else:
+        print("Hoggnuts!")
+        inpt = input("Make like your have a line of inpoots: ")
+        luthor = Lexer(inpt)
     print(luthor.parse)
