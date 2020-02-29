@@ -69,7 +69,7 @@ ERRORS = {
     17: "';' expected",
     18: "'=' expected",
     19: "identifier, if, or while expected",
-    82: "What were you even TRYING to do?!",
+    42: "What were you even TRYING to do?!",
     99: "Syntax error"
 }
 
@@ -132,39 +132,25 @@ class Lexer:
         "DELIMITER": lambda q: q in ['(', ')', '[', ']', '{', '}'],
         "PUNCTUATOR": lambda q: q in [',', ';', ':', '\'', '\"', '.'],
         "COMPARATOR": lambda q: q in ['=', '>', '<', '!'],
-        "SOMETHING ELSE": lambda q: type(q) == chr
+        "LOGICAL": lambda q: q in ['|', '&']
+        # "SOMETHING ELSE": lambda q: type(q) == chr
     }
 
     def __init__(self, inpt):
-        self.input = inpt.lower()
-        self.data = self.input
+        self.input = inpt
+        self.data = self.input.lower()
         self.parse = []
-        c, ctype = self.get_char()
         # TODO: Finish init - determine getter based on char type,
         #       store (unit, token) pairs in self.parse
 
-        # Actually maybe don't do these in __init__?
-        for _ in range(len(self.data)):
-            if ctype == "BLANK":
-                self.get_non_blank()
-            elif ctype == "LETTER":
-                self.parse.append(self.get_char_seq())
-            elif ctype == "DIGIT":
-                self.parse.append(self.get_num_literal())
-            # elif c in SYMBOL:
-            #     self.parse.append(self.get_symbol())
-            else:
-                self.parse.append((c, ">> BAD TOKEN <<"))
-
     def get_char(self):
-        # print("get_char sees self.data containing: ", self.data)
         if len(self.data) > 0:
             c = self.data[0]
             ctype = [k for k, v in self.char_is.items()
                      if self.char_is[k](c)][0]
             return (c, ctype)
         else:
-            return (None, None)
+            return (None, "EOF")
 
     def add_char(self, unit):
         if len(self.data) > 0:
@@ -178,34 +164,31 @@ class Lexer:
     def get_non_blank(self):
         skip = ""
         c, ctype = self.get_char()
-        while c is not None and ctype == "BLANK":
+        while ctype == "BLANK":
             skip = self.add_char(skip)
             c, ctype = self.get_char()
-        return skip
+        return (c, ctype)
 
-    def get_char_seq(self):
-        self.get_non_blank()
+    def get_word(self):
         word = ""
-        c, ctype = self.get_char()
-        while c and ctype != "BLANK":
+        c, ctype = self.get_non_blank()
+        while c and (ctype == "LETTER" or ctype == "DIGIT"):
             word = self.add_char(word)
             c, ctype = self.get_char()
         if word in RESERVED:
             return (word, RESERVED[word])
         else:
-            # FIXME: determine correct token type to return
             return (word, TokenType.IDENTIFIER)
 
     def get_num_literal(self):
-        self.get_non_blank()
         fetch = {
             TokenType.INT_LITERAL: lambda q: numerize(q)[0],
             TokenType.FLOAT_LITERAL: lambda q: numerize(q)[1]
         }
         lit = ""
         token = TokenType.INT_LITERAL
-        c, ctype = self.get_char()
-        while ctype and ctype != "BLANK":
+        c, ctype = self.get_non_blank()
+        while c and (c == '.' or ctype == "DIGIT"):
             lit = self.add_char(lit)
             c, ctype = self.get_char()
         if '.' in lit:
@@ -215,18 +198,37 @@ class Lexer:
             return (nl, token)
         else:
             return (None, None)
+    
+    def get_char_literal(self):
+        print("DOO DOO MEAT")
 
     def get_symbol(self):
-        self.get_non_blank()
         sym = ""
-        c, ctype = self.get_char()
+        c, ctype = self.get_non_blank()
         while c and ctype not in ['BLANK', 'LETTER', 'DIGIT']:
             sym = self.add_char(sym)
             c, ctype = self.get_char()
-        if len(sym) > 0:
+        if sym in SYMBOL:
             return (sym, SYMBOL[sym])
         else:
             return (None, None)
+
+    def lex(self):
+        while (None, TokenType.EOF) not in self.parse:
+            token = None
+            c, ctype = self.get_non_blank()
+            if ctype == "EOF":
+                token = (None, TokenType.EOF)
+            elif ctype == "LETTER":
+                token = self.get_word()
+            elif ctype == "DIGIT":
+                token = self.get_num_literal()
+            elif ctype == "OPERATOR" or ctype == "DELIMITER" or ctype == "PUNCTUATOR" or ctype == "COMPARATOR" or ctype == "LOGICAL":
+                token = self.get_symbol()
+            else:
+                tk, tp = self.get_word()
+                token = (tk, "INVALID TOKEN!")
+            self.parse.append(token)
 
 
 def numerize(nstr):
@@ -250,10 +252,14 @@ def numerize(nstr):
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
-        target = sys.argv[1]
+        if sys.argv[1][0] == '\"':
+            target = sys.argv[1]
+        else:
+            target = open(sys.argv[1], "r")
         luthor = Lexer(target)
     else:
         print("No input file specified.")
         inpt = input("Enter a line to be parsed as input: ")
         luthor = Lexer(inpt)
     print(luthor.parse)
+    target.close()

@@ -7,17 +7,19 @@ from SParse.parser import TokenType
 
 
 class TestLexFuncs(unittest.TestCase):
+
     def setUp(self):
         self.lex = Lexer("{ Input String }")
+        self.salt_file = "Identifier = 1; \n 4.082 >= \t true"
+
         # pass
 
     def test_init(self):
         self.assertIsNotNone(self.lex)
         self.assertIsInstance(self.lex, Lexer)
         self.assertIsInstance(self.lex.input, str)
-        self.assertEqual(self.lex.input, "{ input string }")
+        self.assertEqual(self.lex.input, "{ Input String }")
         self.assertEqual(self.lex.data, "{ input string }")
-        # TODO: Examine the rest of __init__ (?)
 
     def test_get_char(self):
         self.lex.data = "1024 abc"
@@ -38,26 +40,28 @@ class TestLexFuncs(unittest.TestCase):
         self.assertIsNotNone(c)
         self.assertEqual(c, ' ')
         self.assertEqual(ctype, 'BLANK')
-        self.lex.get_non_blank()
+        c, ctype = self.lex.get_non_blank()
+        self.assertEqual(c, ':')
+        self.assertEqual(ctype, "PUNCTUATOR")
         self.assertEqual(self.lex.data, ':')
 
-    def test_get_char_seq(self):
+    def test_get_word(self):
         self.lex.data = "idnt false word_soup while"
-        w, t = self.lex.get_char_seq()
+        w, t = self.lex.get_word()
         self.assertEqual(w, "idnt")
         self.assertEqual(t, TokenType.IDENTIFIER)
-        w, t = self.lex.get_char_seq()
+        w, t = self.lex.get_word()
         self.assertEqual(w, "false")
         self.assertEqual(t, TokenType.FALSE)
-        w, t = self.lex.get_char_seq()
+        w, t = self.lex.get_word()
         self.assertEqual(w, "word_soup")
         self.assertEqual(t, TokenType.IDENTIFIER)
-        w, t = self.lex.get_char_seq()
+        w, t = self.lex.get_word()
         self.assertEqual(w, "while")
         self.assertEqual(t, TokenType.WHILE)
 
     def test_get_num_literal(self):
-        self.lex.data = "1024 512.256"
+        self.lex.data = "1024 512.256 1"
         l, t = self.lex.get_num_literal()
         self.assertEqual(l, 1024)
         self.assertEqual(t, TokenType.INT_LITERAL)
@@ -65,28 +69,31 @@ class TestLexFuncs(unittest.TestCase):
         self.assertEqual(l, 512.256)
         self.assertEqual(t, TokenType.FLOAT_LITERAL)
         l, t = self.lex.get_num_literal()
+        self.assertEqual(l, 1)
+        self.assertEqual(t, TokenType.INT_LITERAL)
+        l, t = self.lex.get_num_literal()
         self.assertIsNone(l)
         self.assertIsNone(t)
 
     def test_get_symbol(self):
         self.lex.data = " + } >= ;q"
-        s, t = self.lex.get_symbol()
-        self.assertEqual(s, '+')
-        self.assertEqual(t, TokenType.ADD)
-        s, t = self.lex.get_symbol()
-        self.assertEqual(s, '}')
-        self.assertEqual(t, TokenType.CLOSE_CURLY)
-        s, t = self.lex.get_symbol()
-        self.assertEqual(s, '>=')
-        self.assertEqual(t, TokenType.GREATER_EQUAL)
-        s, t = self.lex.get_symbol()
-        self.assertEqual(s, ';')
-        self.assertEqual(t, TokenType.SEMICOLON)
-        s, t = self.lex.get_symbol()
-        self.assertIsNone(s)
-        self.assertIsNone(t)
-    
+        tk1 = self.lex.get_symbol()
+        tk2 = self.lex.get_symbol()
+        tk3 = self.lex.get_symbol()
+        tk4 = self.lex.get_symbol()
+        tk5 = self.lex.get_symbol()
+        self.assertEqual(tk1, ('+', TokenType.ADD))
+        self.assertEqual(tk2, ('}', TokenType.CLOSE_CURLY))
+        self.assertEqual(tk3, ('>=', TokenType.GREATER_EQUAL))
+        self.assertEqual(tk4, (';', TokenType.SEMICOLON))
+        self.assertEqual(tk5, (None, None))
 
+    def test_lex(self):
+        self.lex.data = self.salt_file
+        self.lex.lex()
+        self.assertEqual(len(self.lex.parse), 8)
+    #     self.assertEqual(self.lex.parse[0], ("identifier", TokenType.IDENTIFIER))
+    #     self.assertEqual(self.lex.parse[7], ("true", TokenType.TRUE))
 
 
 if __name__ == '__main__':
