@@ -74,6 +74,15 @@ class TestLexFuncs(unittest.TestCase):
         l, t = self.lex.get_num_literal()
         self.assertIsNone(l)
         self.assertIsNone(t)
+    
+    def test_get_char_literal(self):
+        self.lex.data = "'a' 'b' 'c"
+        tk1 = self.lex.get_char_literal()
+        tk2 = self.lex.get_char_literal()
+        tk3 = self.lex.get_char_literal()
+        self.assertEqual(tk1, ('a', TokenType.CHAR_LITERAL))
+        self.assertEqual(tk2, ('b', TokenType.CHAR_LITERAL))
+        self.assertEqual(tk3, (None, None))
 
     def test_get_symbol(self):
         self.lex.data = " + } >= ;q"
@@ -92,8 +101,8 @@ class TestLexFuncs(unittest.TestCase):
         self.lex.data = self.salt_file
         self.lex.lex()
         self.assertEqual(len(self.lex.parse), 8)
-    #     self.assertEqual(self.lex.parse[0], ("identifier", TokenType.IDENTIFIER))
-    #     self.assertEqual(self.lex.parse[7], ("true", TokenType.TRUE))
+        self.assertEqual(self.lex.parse[0], ("Identifier", TokenType.IDENTIFIER))
+        self.assertEqual(self.lex.parse[6], ("true", TokenType.TRUE))
 
 
 if __name__ == '__main__':

@@ -4,8 +4,6 @@ Programming Assignment 1: Lexical / Syntax Parser
 @author Nate Roberts
 '''
 
-# Remember that a char_literal is one character in single-quotes, e.g. 'a'
-
 import sys
 from enum import Enum
 
@@ -83,7 +81,10 @@ RESERVED = {
     "char": TokenType.CHAR_TYPE,
     "while": TokenType.WHILE,
     "if": TokenType.IF,
-    "else": TokenType.ELSE
+    "else": TokenType.ELSE,
+    "main": TokenType.MAIN,
+    "or": TokenType.OR,
+    "and": TokenType.AND
 }
 
 
@@ -140,8 +141,6 @@ class Lexer:
         self.input = inpt
         self.data = self.input.lower()
         self.parse = []
-        # TODO: Finish init - determine getter based on char type,
-        #       store (unit, token) pairs in self.parse
 
     def get_char(self):
         if len(self.data) > 0:
@@ -149,8 +148,7 @@ class Lexer:
             ctype = [k for k, v in self.char_is.items()
                      if self.char_is[k](c)][0]
             return (c, ctype)
-        else:
-            return (None, "EOF")
+        return (None, "EOF")
 
     def add_char(self, unit):
         if len(self.data) > 0:
@@ -177,8 +175,7 @@ class Lexer:
             c, ctype = self.get_char()
         if word in RESERVED:
             return (word, RESERVED[word])
-        else:
-            return (word, TokenType.IDENTIFIER)
+        return (word, TokenType.IDENTIFIER)
 
     def get_num_literal(self):
         fetch = {
@@ -196,11 +193,17 @@ class Lexer:
         if len(lit) > 0:
             nl = fetch[token](lit)
             return (nl, token)
-        else:
-            return (None, None)
+        return (None, None)
     
     def get_char_literal(self):
-        print("DOO DOO MEAT")
+        ch = ""
+        c, ctype = self.get_non_blank()
+        while c and ctype != "BLANK":
+            ch = self.add_char(ch)
+            c, ctype = self.get_char()
+        if len(ch) == 3 and ch[0] == '\'' and ch[1].isalpha() and ch[2] == '\'':
+            return (ch[1], TokenType.CHAR_LITERAL)
+        return (None, None)
 
     def get_symbol(self):
         sym = ""
@@ -210,8 +213,7 @@ class Lexer:
             c, ctype = self.get_char()
         if sym in SYMBOL:
             return (sym, SYMBOL[sym])
-        else:
-            return (None, None)
+        return (None, None)
 
     def lex(self):
         while (None, TokenType.EOF) not in self.parse:
@@ -228,7 +230,22 @@ class Lexer:
             else:
                 tk, tp = self.get_word()
                 token = (tk, "INVALID TOKEN!")
-            self.parse.append(token)
+            if token[0] is not None or token[1] is not None:
+                self.parse.append(token)
+
+    def print_lexed(self):
+        max_token_length = 8
+        for t in self.parse:
+            if len(str(t[0])) > max_token_length:
+                max_token_length = len(t[0])
+        print(f"Longest token: {max_token_length}")
+        print("Lexical tokens in source:")
+        for token in self.parse:
+            if token[0] is not None:
+                ttxt = '{:>{width}}'.format(f"{chr(183)}{token[0]}{chr(183)}", width=max_token_length)
+            else:
+                ttxt = '{:{width}}'.format("<<None>>", width=max_token_length)
+            print(f"|->{ttxt} {token[1]}")
 
 
 def numerize(nstr):
@@ -251,15 +268,25 @@ def numerize(nstr):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        if sys.argv[1][0] == '\"':
-            target = sys.argv[1]
-        else:
-            target = open(sys.argv[1], "r")
-        luthor = Lexer(target)
-    else:
-        print("No input file specified.")
-        inpt = input("Enter a line to be parsed as input: ")
-        luthor = Lexer(inpt)
-    print(luthor.parse)
-    target.close()
+    # data = ""
+    # if len(sys.argv) > 1:
+    #     if sys.argv[1][0] == '\"':
+    #         data = sys.argv[1]
+    #     else:
+    #         test_file = open(sys.argv[1], "r")
+    #         data = test_file.read()
+    #         test_file.close()
+    #     luthor = Lexer(data)
+    # else:
+    #     print("No input file specified.")
+    #     inpt = input("Enter a line to be parsed as input: ")
+    #     luthor = Lexer(inpt)
+    #     luthor.lex()
+    data = (open("./SParse/input_tests/source1.c", "r")).read()
+    luthor = Lexer(data)
+    luthor.lex()
+    # print(luthor.parse)
+    luthor.print_lexed()
+    # print("Lexical tokens found in source file:")
+    # for k, t in luthor.parse:
+    #     print(f"| {k}   -> {t}")
