@@ -684,7 +684,7 @@ class Synter:
             if token == TokenType.CLOSE_CURLY:
                 sub_tree.add(lexeme)
             else:
-                raise Exception(ERRORS[7])
+                raise Exception(ERRORS[19])
         else:
             raise Exception(ERRORS[19])
         tree.add(sub_tree)
