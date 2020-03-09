@@ -428,8 +428,8 @@ class Synter:
         else:
             raise Exception(ERRORS[16])
         # OPTIONAL: [<expression>]
-        lexeme, token = self.pluck()
-        if token == TokenType.OPEN_BRACKET:
+        if self.data[0][1] == TokenType.OPEN_BRACKET:
+            lexeme, token = self.pluck()
             sub_tree.add(lexeme)
             self.parse_expression(sub_tree)
             lexeme, token = self.pluck()
@@ -438,6 +438,7 @@ class Synter:
             else:
                 raise Exception(ERRORS[13])
         # Required: '='
+        lexeme, token = self.pluck()
         if token == TokenType.ASSIGNMENT:
             sub_tree.add(lexeme)
         else:
@@ -670,7 +671,14 @@ class Synter:
             self.parse_while(sub_tree)
         elif next_token == TokenType.OPEN_CURLY:
             # TODO: handle substatements
-            print("I'm a lot of statements!")
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            self.parse_statement(sub_tree)
+            lexeme, token = self.pluck()
+            if token == TokenType.CLOSE_CURLY:
+                sub_tree.add(lexeme)
+            else:
+                raise Exception(ERRORS[7])
         else:
             raise Exception(ERRORS[19])
         tree.add(sub_tree)
@@ -724,8 +732,8 @@ if __name__ == '__main__':
         # luthor.lex()
         # luthor.print_lexed()
     else:
-        # zomp = Synter('./SParse/input_tests/source1.c')
-        raise Exception(ERRORS[1])
+        zomp = Synter('./SParse/input_tests/source2.c')
+        # raise Exception(ERRORS[1])
     # data = (open("./SParse/input_tests/source1.c", "r")).read()
     # data = open(file_name, 'r')
     # luthor = Lexer(data.read())
