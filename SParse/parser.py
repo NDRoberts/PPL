@@ -2,12 +2,14 @@
 CS3210 - Principles of Programming Languages
 Programming Assignment 1: Lexical / Syntax Parser
 @author Nate Roberts
+I do hereby solemnly swear that I whacked this train wreck of code together all by myself, excepting only those blocks expressly credited to other authors.  No one else is to blame.
 '''
 
 import sys
 from enum import Enum
 
 
+# TokenType class based on example by Thyago Mota
 class TokenType(Enum):
     EOF = 0
     INT_TYPE = 1
@@ -326,6 +328,11 @@ class Synter:
         ''' Parse a <program> unit (should be top level parse) '''
         # TODOne: read "int main ( ) { ... }" I guess?
         # TODO: call parse_declaration, parse_statement
+        types = [TokenType.INT_TYPE,
+                 TokenType.FLOAT_TYPE,
+                 TokenType.BOOL_TYPE,
+                 TokenType.CHAR_TYPE]
+        bgn_stmt = [TokenType.OPEN_CURLY, TokenType.IDENTIFIER, TokenType.IF, TokenType.WHILE]
         sub_tree = Tree()
         sub_tree.data = "<program>"
         tree.add(sub_tree)
@@ -366,7 +373,19 @@ class Synter:
 
         # Program Body
         # Required: One or more <declaration>s
+        if self.data[0][1] in types:
+            self.parse_declaration(sub_tree)
+        else:
+            raise Exception(ERRORS[99])
+        while self.data[0][1] in types:
+            self.parse_declaration(sub_tree)
         # Required: One or more <statement>s
+        if self.data[0][1] in bgn_stmt:
+            self.parse_statement(sub_tree)
+        else:
+            raise Exception(ERRORS[99])
+        while self.data[0][1] in bgn_stmt:
+            self.parse_statement(sub_tree)
 
         # Required: '}'
         lexeme, token = self.pluck()
@@ -374,6 +393,13 @@ class Synter:
             sub_tree.add(lexeme)
         else:
             raise Exception(ERRORS[7])
+        
+        # Required: <EOF>
+        lexeme, token = self.pluck()
+        if token == TokenType.EOF:
+            sub_tree.add("")
+        else:
+            raise Exception(ERRORS[6])
 
         tree.add(sub_tree)
         return tree
@@ -383,11 +409,11 @@ class Synter:
         add_sub_ops = [TokenType.ADD, TokenType.SUBTRACT]
         sub_tree = Tree()
         sub_tree.data = '<addition>'
-        parse_term(sub_tree)
+        self.parse_term(sub_tree)
         while self.data[0][1] in add_sub_ops:
             lexeme, token = self.pluck()
             sub_tree.add(lexeme)
-            parse_term(sub_tree)
+            self.parse_term(sub_tree)
         tree.add(sub_tree)
         return tree
 
@@ -403,24 +429,24 @@ class Synter:
             raise Exception(ERRORS[16])
         # OPTIONAL: [<expression>]
         lexeme, token = self.pluck()
-        if token == TokenTypes.OPEN_BRACKET:
+        if token == TokenType.OPEN_BRACKET:
             sub_tree.add(lexeme)
-            parse_expression(sub_tree)
+            self.parse_expression(sub_tree)
             lexeme, token = self.pluck()
-            if token == TokenTypes.CLOSE_BRACKET:
+            if token == TokenType.CLOSE_BRACKET:
                 sub_tree.add(lexeme)
             else:
                 raise Exception(ERRORS[13])
         # Required: '='
-        if token == TokenTypes.ASSIGNMENT:
+        if token == TokenType.ASSIGNMENT:
             sub_tree.add(lexeme)
         else:
             raise Exception(ERRORS[18])
         # Required: <expression>
-        parse_expression(sub_tree)
+        self.parse_expression(sub_tree)
         # Required: ';'
         lexeme, token = self.pluck()
-        if token == TokenTypes.SEMICOLON:
+        if token == TokenType.SEMICOLON:
             sub_tree.add(lexeme)
         else:
             raise Exception(ERRORS[17])
@@ -430,12 +456,12 @@ class Synter:
     def parse_conjunction(self, tree):
         # TODOne: call parse_equality
         sub_tree = Tree()
-        sub.tree.data = '<conjunction>'
-        parse_equality(sub_tree)
+        sub_tree.data = '<conjunction>'
+        self.parse_equality(sub_tree)
         while self.data[0][1] == TokenType.AND:
             lexeme, token = self.pluck()
             sub_tree.add(lexeme)
-            parse_equality(sub_tree)
+            self.parse_equality(sub_tree)
         tree.add(sub_tree)
         return tree
 
@@ -451,7 +477,7 @@ class Synter:
 
         # Required: <type>
         lexeme, token = self.pluck()
-        if token in self.types:
+        if token in types:
             sub_tree.add(lexeme)
         else:
             raise Exception(ERRORS[99])
@@ -491,21 +517,19 @@ class Synter:
                 sub_tree.add(lexeme)
             else:
                 raise Exception(ERRORS[16])
-            lexeme, token = self.pluck()
-            if token == TokenType.OPEN_BRACKET:
+            if self.data[0][1] == TokenType.OPEN_BRACKET:
+                lexeme, token = self.pluck()
                 sub_tree.add(lexeme)
-            else:
-                raise Exception(ERRORS[15])
-            lexeme, token = self.pluck()
-            if token == TokenType.INT_LITERAL:
-                sub_tree.add(lexeme)
-            else:
-                raise Exception(ERRORS[14])
-            lexeme, token = self.pluck()
-            if token == TokenType.CLOSE_BRACKET:
-                sub_tree.add(lexeme)
-            else:
-                raise Exception(ERRORS[13])
+                lexeme, token = self.pluck()
+                if token == TokenType.INT_LITERAL:
+                    sub_tree.add(lexeme)
+                else:
+                    raise Exception(ERRORS[14])
+                lexeme, token = self.pluck()
+                if token == TokenType.CLOSE_BRACKET:
+                    sub_tree.add(lexeme)
+                else:
+                    raise Exception(ERRORS[13])
         # Required: ';'
         lexeme, token = self.pluck()
         if token == TokenType.SEMICOLON:
@@ -521,11 +545,11 @@ class Synter:
         eq_neq_ops = [TokenType.EQUALITY, TokenType.INEQUALITY]
         sub_tree = Tree()
         sub_tree.data = '<equality>'
-        parse_relation(sub_tree)
+        self.parse_relation(sub_tree)
         if self.data[0][1] in eq_neq_ops:
             lexeme, token = self.pluck()
             sub_tree.add(lexeme)
-            parse_relation(sub_tree)
+            self.parse_relation(sub_tree)
         tree.add(sub_tree)
         return tree
 
@@ -533,11 +557,11 @@ class Synter:
         # TODOne: call parse_conjunction
         sub_tree = Tree()
         sub_tree.data = '<expression>'
-        parse_conjunction(sub_tree)
+        self.parse_conjunction(sub_tree)
         while self.data[0][1] == TokenType.OR:
             lexeme, token = self.pluck()
             sub_tree.add(lexeme)
-            parse_conjunction(sub_tree)
+            self.parse_conjunction(sub_tree)
         tree.add(sub_tree)
         return tree
 
@@ -548,24 +572,25 @@ class Synter:
         sub_tree.data = '<factor>'
         # Required: <identifier> OR <identifier> [<expression>] OR
         # <literal> OR (<expression>)
-        lexeme, token = self.pluck()
-        if token == TokenType.IDENTIFIER:
+        next_token = self.data[0][1]
+        if next_token == TokenType.IDENTIFIER:
+            lexeme, token = self.pluck()
             sub_tree.add(lexeme)
             if self.data[0][1] == TokenType.OPEN_BRACKET:
                 lexeme, token = self.pluck()
                 sub_tree.add(lexeme)
-                parse_expression(sub_tree)
+                self.parse_expression(sub_tree)
                 lexeme, token = self.pluck()
                 if token == TokenType.CLOSE_BRACKET:
                     sub_tree.add(lexeme)
                 else:
                     raise Exception(ERRORS[13])
-        elif token in literals:
-            parse_literal(sub_tree)
-        elif token == TokenType.OPEN_PAR:
+        elif next_token in literals:
+            self.parse_literal(sub_tree)
+        elif next_token == TokenType.OPEN_PAR:
             lexeme, token = self.pluck()
             sub_tree.add(lexeme)
-            parse_expression(sub_tree)
+            self.parse_expression(sub_tree)
             lexeme, token = self.pluck()
             if token == TokenType.CLOSE_PAR:
                 sub_tree.add(lexeme)
@@ -591,7 +616,7 @@ class Synter:
             sub_tree.add(lexeme)
         else:
             raise Exception(ERRORS[10])
-        parse_expression(sub_tree)
+        self.parse_expression(sub_tree)
         lexeme, token = self.pluck()
         if token == TokenType.CLOSE_PAR:
             sub_tree.add(lexeme)
@@ -600,7 +625,7 @@ class Synter:
         if self.data[0][1] == TokenType.ELSE:
             lexeme, token = self.pluck()
             sub_tree.add(lexeme)
-            parse_statement(sub_tree)
+            self.parse_statement(sub_tree)
         tree.add(sub_tree)
         return tree
 
@@ -611,7 +636,7 @@ class Synter:
         sub_tree.data = '<literal>'
         lexeme, token = self.pluck()
         if token in literals:
-            sub_tree.add(lexeme)
+            sub_tree.add(str(lexeme))
         else:
             raise Exception(ERRORS[99])
         tree.add(sub_tree)
@@ -623,11 +648,11 @@ class Synter:
                    TokenType.GREATER, TokenType.GREATER_EQUAL]
         sub_tree = Tree()
         sub_tree.data = '<relation>'
-        parse_addition(sub_tree)
+        self.parse_addition(sub_tree)
         if self.data[0][1] in rel_ops:
             lexeme, token = self.pluck()
             sub_tree.add(lexeme)
-            parse_addition(sub_tree)
+            self.parse_addition(sub_tree)
         tree.add(sub_tree)
         return tree
 
@@ -638,11 +663,11 @@ class Synter:
         next_token = self.data[0][1]
         # Required: <assignment>, <if>, <while>, or {<statement>+}
         if next_token == TokenType.IDENTIFIER:
-            parse_assignment(sub_tree)
+            self.parse_assignment(sub_tree)
         elif next_token == TokenType.IF:
-            parse_if(sub_tree)
+            self.parse_if(sub_tree)
         elif next_token == TokenType.WHILE:
-            parse_while(sub_tree)
+            self.parse_while(sub_tree)
         elif next_token == TokenType.OPEN_CURLY:
             # TODO: handle substatements
             print("I'm a lot of statements!")
@@ -656,11 +681,11 @@ class Synter:
         mul_div_ops = [TokenType.MULTIPLY, TokenType.DIVIDE]
         sub_tree = Tree()
         sub_tree.data = '<term>'
-        parse_factor(sub_tree)
+        self.parse_factor(sub_tree)
         while self.data[0][1] in mul_div_ops:
             lexeme, token = self.pluck()
             sub_tree.add(lexeme)
-            parse_factor(sub_tree)
+            self.parse_factor(sub_tree)
         tree.add(sub_tree)
         return tree
 
@@ -679,14 +704,14 @@ class Synter:
             sub_tree.add(lexeme)
         else:
             raise Exception(ERRORS[10])
-        parse_expression(sub_tree)
+        self.parse_expression(sub_tree)
         # Required: ')'
         lexeme, token = self.pluck()
         if token == TokenType.CLOSE_PAR:
             sub_tree.add(lexeme)
         else:
             raise Exception(ERRORS[9])
-        parse_statement(sub_tree)
+        self.parse_statement(sub_tree)
         tree.add(sub_tree)
         return tree
 
@@ -699,8 +724,8 @@ if __name__ == '__main__':
         # luthor.lex()
         # luthor.print_lexed()
     else:
-        zomp = Synter('./SParse/input_tests/source1.c')
-        # raise Exception(ERRORS[1])
+        # zomp = Synter('./SParse/input_tests/source1.c')
+        raise Exception(ERRORS[1])
     # data = (open("./SParse/input_tests/source1.c", "r")).read()
     # data = open(file_name, 'r')
     # luthor = Lexer(data.read())
