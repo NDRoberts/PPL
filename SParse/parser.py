@@ -236,29 +236,28 @@ class Lexer:
         if '.' in lit:
             token = TokenType.FLOAT_LITERAL
         if len(lit) > 0:
-            nl = fetch[token](lit)
+            nl = str(fetch[token](lit))
             return (nl, token)
         return (None, None)
 
     def get_char_literal(self):
         ch = ""
         c, ctype = self.get_non_blank()
-        while c and ctype != "BLANK":
+        for i in range(3):
             ch = self.add_char(ch)
-            c, ctype = self.get_char()
-        if len(ch) == 3 and ch[0] == '\'' and \
-                ch[1].isalpha() and ch[2] == '\'':
-            return (ch[1], TokenType.CHAR_LITERAL)
-        return (None, None)
+        if (ch[1].isalpha() or ch[1].isdigit()) and ch[0] == '\'' and ch[2] == '\'':
+            return (ch, TokenType.CHAR_LITERAL)
+        raise Exception(ERRORS[3])
 
     def get_symbol(self):
         sym = ""
         c, ctype = self.get_non_blank()
-        while c and ctype not in ['BLANK', 'LETTER', 'DIGIT']:
+        sym = self.add_char(sym)
+        c, ctype = self.get_char()
+        if c in ['=', '|', '&']:
             sym = self.add_char(sym)
-            c, ctype = self.get_char()
-            if sym in SYMBOL:
-                return (sym, SYMBOL[sym])
+        if sym in SYMBOL:
+            return (sym, SYMBOL[sym])
         return (None, None)
 
     def lex(self):
@@ -272,6 +271,8 @@ class Lexer:
                 token = self.get_word()
             elif ctype == "DIGIT":
                 token = self.get_num_literal()
+            elif c == '\'':
+                token = self.get_char_literal()
             elif ctype == "OPERATOR" or ctype == "DELIMITER" or \
                     ctype == "PUNCTUATOR" or ctype == "COMPARATOR" or \
                     ctype == "LOGICAL":
@@ -637,7 +638,7 @@ class Synter:
         sub_tree.data = '<literal>'
         lexeme, token = self.pluck()
         if token in literals:
-            sub_tree.add(str(lexeme))
+            sub_tree.add(lexeme)
         else:
             raise Exception(ERRORS[99])
         tree.add(sub_tree)
@@ -659,6 +660,10 @@ class Synter:
 
     def parse_statement(self, tree):
         # TODOne: call parse_assignment, parse_if, parse_while
+        bgn_stmt = [TokenType.OPEN_CURLY,
+                    TokenType.IDENTIFIER,
+                    TokenType.IF,
+                    TokenType.WHILE]
         sub_tree = Tree()
         sub_tree.data = '<statement>'
         next_token = self.data[0][1]
@@ -673,7 +678,8 @@ class Synter:
             # TODO: handle substatements
             lexeme, token = self.pluck()
             sub_tree.add(lexeme)
-            self.parse_statement(sub_tree)
+            while self.data[0][1] in bgn_stmt:
+                self.parse_statement(sub_tree)
             lexeme, token = self.pluck()
             if token == TokenType.CLOSE_CURLY:
                 sub_tree.add(lexeme)
@@ -732,7 +738,7 @@ if __name__ == '__main__':
         # luthor.lex()
         # luthor.print_lexed()
     else:
-        zomp = Synter('./SParse/input_tests/source2.c')
+        zomp = Synter('./SParse/input_tests/source5.c')
         # raise Exception(ERRORS[1])
     # data = (open("./SParse/input_tests/source1.c", "r")).read()
     # data = open(file_name, 'r')
