@@ -47,6 +47,7 @@ class TokenType(Enum):
     CHAR_LITERAL = 35
 
 
+# Error table provided by Thyago Mota
 ERRORS = {
     1: "Source file missing",
     2: "Couldn't open source file",
@@ -122,6 +123,48 @@ SYMBOL = {
 }
 
 
+def numerize(nstr):
+    ingr, frac = 0, 0
+    if '.' in nstr:
+        pt = nstr.index('.')
+        for i in range(pt):
+            ingr += (ord(nstr[i]) - 48) * (10 ** (pt - i - 1))
+        for j in range(len(nstr) - pt):
+            if j > 0:
+                frac += (ord(nstr[j + pt]) - 48) * (10 ** -j)
+    else:
+        pt = len(nstr)
+        for i in range(pt):
+            ingr += (ord(nstr[i]) - 48) * (10 ** (pt - i - 1))
+    if frac >= 0.5:
+        return (int(ingr + 1), float(ingr + frac))
+    else:
+        return (int(ingr), float(ingr + frac))
+
+
+# Tree class by Thyago Mota
+class Tree:
+
+    TAB = "   "
+
+    def __init__(self):
+        self.data = None
+        self.children = []
+
+    def add(self, child):
+        self.children.append(child)
+
+    def print(self, tab=""):
+        if self.data is not None:
+            print(tab + self.data)
+            tab += self.TAB
+            for child in self.children:
+                if isinstance(child, Tree):
+                    child.print(tab)
+                else:
+                    print(tab + child)
+
+
 class Lexer:
     ''' Instantiable lexical parser '''
     char_is = {
@@ -194,14 +237,15 @@ class Lexer:
             nl = fetch[token](lit)
             return (nl, token)
         return (None, None)
-    
+
     def get_char_literal(self):
         ch = ""
         c, ctype = self.get_non_blank()
         while c and ctype != "BLANK":
             ch = self.add_char(ch)
             c, ctype = self.get_char()
-        if len(ch) == 3 and ch[0] == '\'' and ch[1].isalpha() and ch[2] == '\'':
+        if len(ch) == 3 and ch[0] == '\'' and \
+                ch[1].isalpha() and ch[2] == '\'':
             return (ch[1], TokenType.CHAR_LITERAL)
         return (None, None)
 
@@ -211,21 +255,24 @@ class Lexer:
         while c and ctype not in ['BLANK', 'LETTER', 'DIGIT']:
             sym = self.add_char(sym)
             c, ctype = self.get_char()
-        if sym in SYMBOL:
-            return (sym, SYMBOL[sym])
+            if sym in SYMBOL:
+                return (sym, SYMBOL[sym])
         return (None, None)
 
     def lex(self):
         while (None, TokenType.EOF) not in self.parse:
             token = None
             c, ctype = self.get_non_blank()
+            # print(f"Character [ {c} ] is a {ctype}.")
             if ctype == "EOF":
                 token = (None, TokenType.EOF)
             elif ctype == "LETTER":
                 token = self.get_word()
             elif ctype == "DIGIT":
                 token = self.get_num_literal()
-            elif ctype == "OPERATOR" or ctype == "DELIMITER" or ctype == "PUNCTUATOR" or ctype == "COMPARATOR" or ctype == "LOGICAL":
+            elif ctype == "OPERATOR" or ctype == "DELIMITER" or \
+                    ctype == "PUNCTUATOR" or ctype == "COMPARATOR" or \
+                    ctype == "LOGICAL":
                 token = self.get_symbol()
             else:
                 tk, tp = self.get_word()
@@ -234,59 +281,426 @@ class Lexer:
                 self.parse.append(token)
 
     def print_lexed(self):
-        max_token_length = 8
+        max_txt_length = 8
         for t in self.parse:
-            if len(str(t[0])) > max_token_length:
-                max_token_length = len(t[0])
-        print(f"Longest token: {max_token_length}")
+            if len(str(t[0])) > max_txt_length:
+                max_txt_length = len(str(t[0]))
+        print(f"Longest token: {max_txt_length}")
         print("Lexical tokens in source:")
         for token in self.parse:
             if token[0] is not None:
-                ttxt = '{:>{width}}'.format(f"{chr(183)}{token[0]}{chr(183)}", width=max_token_length)
+                ttxt = '{:>{width}}'.format(token[0], width=max_txt_length)
             else:
-                ttxt = '{:{width}}'.format("<<None>>", width=max_token_length)
-            print(f"|->{ttxt} {token[1]}")
+                ttxt = '{:>{width}}'.format("<<None>>", width=max_txt_length)
+            print(f"|-> {ttxt} ({token[1]})")
 
 
-def numerize(nstr):
-    ingr, frac = 0, 0
-    if '.' in nstr:
-        pt = nstr.index('.')
-        for i in range(pt):
-            ingr += (ord(nstr[i]) - 48) * (10 ** (pt - i - 1))
-        for j in range(len(nstr) - pt):
-            if j > 0:
-                frac += (ord(nstr[j + pt]) - 48) * (10 ** -j)
-    else:
-        pt = len(nstr)
-        for i in range(pt):
-            ingr += (ord(nstr[i]) - 48) * (10 ** (pt - i - 1))
-    if frac >= 0.5:
-        return (int(ingr + 1), float(ingr + frac))
-    else:
-        return (int(ingr), float(ingr + frac))
+class Synter:
+    ''' Instantiable Syntactic Parser '''
+
+    def __init__(self, src):
+        pfile = open(src, 'r')
+        if not pfile:
+            raise IOError(ERRORS[2])
+        lexida = Lexer(pfile.read())
+        lexida.lex()
+        self.data = lexida.parse
+        self.tree = Tree()
+        self.tree.data = "<ROOT>"
+        self.tree = self.parse_program(self.tree)
+        self.tree.print()
+
+    def has_tokens(self):
+        ''' Return True if tokens remain to be parsed (for readability) '''
+        return len(self.data) > 0
+
+    def pluck(self):
+        ''' Remove next available (lexeme, token) pair from queue and return it '''
+        if not self.has_tokens():
+            raise Exception(ERRORS[99])
+        lexeme, token = self.data[0]
+        self.data = self.data[1:]
+        return lexeme, token
+
+    def parse_program(self, tree):
+        ''' Parse a <program> unit (should be top level parse) '''
+        # TODOne: read "int main ( ) { ... }" I guess?
+        # TODO: call parse_declaration, parse_statement
+        sub_tree = Tree()
+        sub_tree.data = "<program>"
+        tree.add(sub_tree)
+        END = False
+
+        # Required: 'int'
+        lexeme, token = self.pluck()
+        if token == TokenType.INT_TYPE:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[12])
+
+        # Required: 'main'
+        lexeme, token = self.pluck()
+        if token == TokenType.MAIN:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[11])
+
+        # Required: '()'
+        lexeme, token = self.pluck()
+        if token == TokenType.OPEN_PAR:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[10])
+        lexeme, token = self.pluck()
+        if token == TokenType.CLOSE_PAR:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[9])
+
+        # Required: '{'
+        lexeme, token = self.pluck()
+        if token == TokenType.OPEN_CURLY:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[8])
+
+        # Program Body
+        # Required: One or more <declaration>s
+        # Required: One or more <statement>s
+
+        # Required: '}'
+        lexeme, token = self.pluck()
+        if token == TokenType.CLOSE_CURLY:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[7])
+
+        tree.add(sub_tree)
+        return tree
+
+    def parse_addition(self, tree):
+        # TODOne: call parse_term; also takes add/sub operators
+        add_sub_ops = [TokenType.ADD, TokenType.SUBTRACT]
+        sub_tree = Tree()
+        sub_tree.data = '<addition>'
+        parse_term(sub_tree)
+        while self.data[0][1] in add_sub_ops:
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            parse_term(sub_tree)
+        tree.add(sub_tree)
+        return tree
+
+    def parse_assignment(self, tree):
+        # TODOne: takes Identifiers and Expressions
+        sub_tree = Tree()
+        sub_tree.data = '<assignment>'
+        # Required: <identifier>
+        lexeme, token = self.pluck()
+        if token == TokenType.IDENTIFIER:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[16])
+        # OPTIONAL: [<expression>]
+        lexeme, token = self.pluck()
+        if token == TokenTypes.OPEN_BRACKET:
+            sub_tree.add(lexeme)
+            parse_expression(sub_tree)
+            lexeme, token = self.pluck()
+            if token == TokenTypes.CLOSE_BRACKET:
+                sub_tree.add(lexeme)
+            else:
+                raise Exception(ERRORS[13])
+        # Required: '='
+        if token == TokenTypes.ASSIGNMENT:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[18])
+        # Required: <expression>
+        parse_expression(sub_tree)
+        # Required: ';'
+        lexeme, token = self.pluck()
+        if token == TokenTypes.SEMICOLON:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[17])
+        tree.add(sub_tree)
+        return tree
+
+    def parse_conjunction(self, tree):
+        # TODOne: call parse_equality
+        sub_tree = Tree()
+        sub.tree.data = '<conjunction>'
+        parse_equality(sub_tree)
+        while self.data[0][1] == TokenType.AND:
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            parse_equality(sub_tree)
+        tree.add(sub_tree)
+        return tree
+
+    def parse_declaration(self, tree):
+        # TODOne: takes Types, Identifiers, Int_literals
+        types = [TokenType.INT_TYPE,
+                 TokenType.FLOAT_TYPE,
+                 TokenType.BOOL_TYPE,
+                 TokenType.CHAR_TYPE]
+        sub_tree = Tree()
+        sub_tree.data = "<declaration>"
+        finished = False
+
+        # Required: <type>
+        lexeme, token = self.pluck()
+        if token in self.types:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[99])
+
+        # Required: <identifier>
+        lexeme, token = self.pluck()
+        if token == TokenType.IDENTIFIER:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[16])
+
+        # OPTIONAL: '[ <int_literal> ]'
+        if self.data[0][1] == TokenType.OPEN_BRACKET:
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            lexeme, token = self.pluck()
+            if token == TokenType.INT_LITERAL:
+                sub_tree.add(lexeme)
+            else:
+                raise Exception(ERRORS[14])
+            lexeme, token = self.pluck()
+            if token == TokenType.CLOSE_BRACKET:
+                sub_tree.add(lexeme)
+            else:
+                raise Exception(ERRORS[13])
+
+        # OPTIONAL: Further <identifier> [<int_literal>] pairs
+        while not finished:
+            if self.data[0][1] == TokenType.COMMA:
+                lexeme, token = self.pluck()
+                sub_tree.add(lexeme)
+            else:
+                finished
+                break
+            lexeme, token = self.pluck()
+            if token == TokenType.IDENTIFIER:
+                sub_tree.add(lexeme)
+            else:
+                raise Exception(ERRORS[16])
+            lexeme, token = self.pluck()
+            if token == TokenType.OPEN_BRACKET:
+                sub_tree.add(lexeme)
+            else:
+                raise Exception(ERRORS[15])
+            lexeme, token = self.pluck()
+            if token == TokenType.INT_LITERAL:
+                sub_tree.add(lexeme)
+            else:
+                raise Exception(ERRORS[14])
+            lexeme, token = self.pluck()
+            if token == TokenType.CLOSE_BRACKET:
+                sub_tree.add(lexeme)
+            else:
+                raise Exception(ERRORS[13])
+        # Required: ';'
+        lexeme, token = self.pluck()
+        if token == TokenType.SEMICOLON:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[17])
+
+        tree.add(sub_tree)
+        return tree
+
+    def parse_equality(self, tree):
+        # TODOne: call parse_relation; also takes eq/neq operators?
+        eq_neq_ops = [TokenType.EQUALITY, TokenType.INEQUALITY]
+        sub_tree = Tree()
+        sub_tree.data = '<equality>'
+        parse_relation(sub_tree)
+        if self.data[0][1] in eq_neq_ops:
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            parse_relation(sub_tree)
+        tree.add(sub_tree)
+        return tree
+
+    def parse_expression(self, tree):
+        # TODOne: call parse_conjunction
+        sub_tree = Tree()
+        sub_tree.data = '<expression>'
+        parse_conjunction(sub_tree)
+        while self.data[0][1] == TokenType.OR:
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            parse_conjunction(sub_tree)
+        tree.add(sub_tree)
+        return tree
+
+    def parse_factor(self, tree):
+        # TODOne: call parse_expression, parse_literal; also takes identifiers
+        literals = [TokenType.INT_LITERAL, TokenType.FLOAT_LITERAL, TokenType.CHAR_LITERAL, TokenType.TRUE, TokenType.FALSE]
+        sub_tree = Tree()
+        sub_tree.data = '<factor>'
+        # Required: <identifier> OR <identifier> [<expression>] OR
+        # <literal> OR (<expression>)
+        lexeme, token = self.pluck()
+        if token == TokenType.IDENTIFIER:
+            sub_tree.add(lexeme)
+            if self.data[0][1] == TokenType.OPEN_BRACKET:
+                lexeme, token = self.pluck()
+                sub_tree.add(lexeme)
+                parse_expression(sub_tree)
+                lexeme, token = self.pluck()
+                if token == TokenType.CLOSE_BRACKET:
+                    sub_tree.add(lexeme)
+                else:
+                    raise Exception(ERRORS[13])
+        elif token in literals:
+            parse_literal(sub_tree)
+        elif token == TokenType.OPEN_PAR:
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            parse_expression(sub_tree)
+            lexeme, token = self.pluck()
+            if token == TokenType.CLOSE_PAR:
+                sub_tree.add(lexeme)
+            else:
+                raise Exception(ERRORS[9])
+        else:
+            raise Exception(ERRORS[16])
+        tree.add(sub_tree)
+        return tree
+
+    def parse_if(self, tree):
+        # TODOne: call parse_expression, parse_statement
+        sub_tree = Tree()
+        sub_tree.data = '<if>'
+        lexeme, token = self.pluck()
+        if token == TokenType.IF:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[99])
+        # Required: '('
+        lexeme, token = self.pluck()
+        if token == TokenType.OPEN_PAR:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[10])
+        parse_expression(sub_tree)
+        lexeme, token = self.pluck()
+        if token == TokenType.CLOSE_PAR:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[9])
+        if self.data[0][1] == TokenType.ELSE:
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            parse_statement(sub_tree)
+        tree.add(sub_tree)
+        return tree
+
+    def parse_literal(self, tree):
+        # TODOne: Figure out which kind it is or something
+        literals = [TokenType.INT_LITERAL, TokenType.FLOAT_LITERAL, TokenType.CHAR_LITERAL, TokenType.TRUE, TokenType.FALSE]
+        sub_tree = Tree()
+        sub_tree.data = '<literal>'
+        lexeme, token = self.pluck()
+        if token in literals:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[99])
+        tree.add(sub_tree)
+        return tree
+
+    def parse_relation(self, tree):
+        # TODOne: call parse_addition; also takes rel_ops?
+        rel_ops = [TokenType.LESS, TokenType.LESS_EQUAL,
+                   TokenType.GREATER, TokenType.GREATER_EQUAL]
+        sub_tree = Tree()
+        sub_tree.data = '<relation>'
+        parse_addition(sub_tree)
+        if self.data[0][1] in rel_ops:
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            parse_addition(sub_tree)
+        tree.add(sub_tree)
+        return tree
+
+    def parse_statement(self, tree):
+        # TODOne: call parse_assignment, parse_if, parse_while
+        sub_tree = Tree()
+        sub_tree.data = '<statement>'
+        next_token = self.data[0][1]
+        # Required: <assignment>, <if>, <while>, or {<statement>+}
+        if next_token == TokenType.IDENTIFIER:
+            parse_assignment(sub_tree)
+        elif next_token == TokenType.IF:
+            parse_if(sub_tree)
+        elif next_token == TokenType.WHILE:
+            parse_while(sub_tree)
+        elif next_token == TokenType.OPEN_CURLY:
+            # TODO: handle substatements
+            print("I'm a lot of statements!")
+        else:
+            raise Exception(ERRORS[19])
+        tree.add(sub_tree)
+        return tree
+
+    def parse_term(self, tree):
+        # TODOne: call parse_factor; also takes mult/div operators
+        mul_div_ops = [TokenType.MULTIPLY, TokenType.DIVIDE]
+        sub_tree = Tree()
+        sub_tree.data = '<term>'
+        parse_factor(sub_tree)
+        while self.data[0][1] in mul_div_ops:
+            lexeme, token = self.pluck()
+            sub_tree.add(lexeme)
+            parse_factor(sub_tree)
+        tree.add(sub_tree)
+        return tree
+
+    def parse_while(self, tree):
+        # TODOne: call parse_expression, parse_statement
+        sub_tree = Tree()
+        sub_tree.data = '<while>'
+        lexeme, token = self.pluck()
+        if token == TokenType.WHILE:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[99])
+        # Required: '('
+        lexeme, token = self.pluck()
+        if token == TokenType.OPEN_PAR:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[10])
+        parse_expression(sub_tree)
+        # Required: ')'
+        lexeme, token = self.pluck()
+        if token == TokenType.CLOSE_PAR:
+            sub_tree.add(lexeme)
+        else:
+            raise Exception(ERRORS[9])
+        parse_statement(sub_tree)
+        tree.add(sub_tree)
+        return tree
 
 
 if __name__ == '__main__':
-    # data = ""
-    # if len(sys.argv) > 1:
-    #     if sys.argv[1][0] == '\"':
-    #         data = sys.argv[1]
-    #     else:
-    #         test_file = open(sys.argv[1], "r")
-    #         data = test_file.read()
-    #         test_file.close()
-    #     luthor = Lexer(data)
-    # else:
-    #     print("No input file specified.")
-    #     inpt = input("Enter a line to be parsed as input: ")
-    #     luthor = Lexer(inpt)
-    #     luthor.lex()
-    data = (open("./SParse/input_tests/source1.c", "r")).read()
-    luthor = Lexer(data)
-    luthor.lex()
-    # print(luthor.parse)
-    luthor.print_lexed()
-    # print("Lexical tokens found in source file:")
-    # for k, t in luthor.parse:
-    #     print(f"| {k}   -> {t}")
+    if len(sys.argv) == 2:
+        file_name = sys.argv[1]
+        zamp = Synter(file_name)
+        # luthor = Lexer(open(file_name, 'r').read())
+        # luthor.lex()
+        # luthor.print_lexed()
+    else:
+        zomp = Synter('./SParse/input_tests/source1.c')
+        # raise Exception(ERRORS[1])
+    # data = (open("./SParse/input_tests/source1.c", "r")).read()
+    # data = open(file_name, 'r')
+    # luthor = Lexer(data.read())

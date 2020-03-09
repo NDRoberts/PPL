@@ -3,7 +3,8 @@
 import unittest
 from SParse.parser import Lexer
 from SParse.parser import TokenType
-# from unittest.mock import mock_open, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 
 class TestLexFuncs(unittest.TestCase):
@@ -101,8 +102,18 @@ class TestLexFuncs(unittest.TestCase):
         self.lex.data = self.salt_file
         self.lex.lex()
         self.assertEqual(len(self.lex.parse), 8)
-        self.assertEqual(self.lex.parse[0], ("Identifier", TokenType.IDENTIFIER))
+        self.assertEqual(self.lex.parse[0], ("Identifier",
+                         TokenType.IDENTIFIER))
         self.assertEqual(self.lex.parse[6], ("true", TokenType.TRUE))
+
+    # TODO: I am suspending TDD, temporarily, because my knowledge
+    # of it is no longer adequate relative to the time available
+    # to me to turn this project in.  I will return to it at a later
+    # date; for now, I hope I can make things work.
+    @patch(Lexer.print)
+    def test_print_lexed(self, mock_print):
+        self.lex.print_lexed()
+        mock_print.assertCalled()
 
 
 if __name__ == '__main__':
