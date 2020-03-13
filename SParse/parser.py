@@ -734,12 +734,6 @@ if __name__ == '__main__':
     if len(sys.argv) == 2:
         file_name = sys.argv[1]
         zamp = Synter(file_name)
-        # luthor = Lexer(open(file_name, 'r').read())
-        # luthor.lex()
-        # luthor.print_lexed()
     else:
-        zomp = Synter('./SParse/input_tests/source5.c')
-        # raise Exception(ERRORS[1])
-    # data = (open("./SParse/input_tests/source1.c", "r")).read()
-    # data = open(file_name, 'r')
-    # luthor = Lexer(data.read())
+        #zomp = Synter('./SParse/input_tests/source5.c')
+        raise Exception(ERRORS[1])
